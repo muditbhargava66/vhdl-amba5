@@ -1,1 +1,50 @@
-build/*
+# Build directories
+build/
+build-*/
+
+# HBS generated files
+*.json
+
+# Simulator output
+*.ghw
+*.vcd
+*.fst
+*.wdb
+
+# NVC work directories
+work/
+_work/
+
+# Questa/ModelSim
+transcript
+vsim.wlf
+modelsim.ini
+
+# Vivado/xsim
+*.jou
+*.log
+*.pb
+*.xpr
+.Xil/
+xsim.dir/
+
+# GHDL work directories
+*.cf
+
+# GTKWave
+*.gtkw~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python cache
+__pycache__/
+*.pyc

@@ -20,13 +20,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y tcl
-      - name: Get HBS
-        run: |
-          wget https://raw.github.com/m-kru/hbs/master/hbs
-          wget https://raw.github.com/m-kru/hbs/master/hbs.tcl
-          chmod +x hbs hbs.tcl
       - name: Run tests
         run: |
           export HBS_TOOL=ghdl
           export HBS_BUILD_DIR=build-apb-ghdl
-          ./hbs test apb
+          ./scripts/hbs test apb
+

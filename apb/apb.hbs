@@ -3,343 +3,349 @@
 # Copyright (c) 2024 Michał Kruszewski
 
 namespace eval vhdl::amba5::apb {
-  # APB package with all primary types and functions.
-  namespace eval pkg {
-    proc src {} {
-      hbs::SetLib "lapb"
-      hbs::AddFile apb.vhd
-    }
+# APB package with all primary types and functions.
+namespace eval pkg {
+proc src {} {
+hbs::SetLib "lapb"
+hbs::AddFile apb.vhd
+}
 
-    proc _tb {top} {
-      hbs::SetTool "nvc"
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-      }
-      hbs::SetTop $top
-      src
-      hbs::SetLib ""
-    }
+proc _tb {top} {
+hbs::SetTool "nvc"
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+}
+hbs::SetTop $top
+src
+hbs::SetLib ""
+}
 
-    # Testbench for protection_t functions.
-    proc tb-prot-funcs {} {
-      _tb "tb_prot_funcs"
-      hbs::AddFile tb/tb-prot-funcs.vhd
-      hbs::Run
-    }
+# Testbench for protection_t functions.
+proc tb-prot-funcs {} {
+_tb "tb_prot_funcs"
+hbs::AddFile tb/tb-prot-funcs.vhd
+hbs::Run
+}
 
-    # Testbench for various util functions.
-    proc tb-util-funcs {} {
-      _tb "tb_util_funcs"
-      hbs::AddFile tb/tb-util-funcs.vhd
-      hbs::Run
-    }
+# Testbench for various util functions.
+proc tb-util-funcs {} {
+_tb "tb_util_funcs"
+hbs::AddFile tb/tb-util-funcs.vhd
+hbs::Run
+}
 
-    hbs::Register
-  }
+hbs::Register
+}
 
-  # Interface checker core.
-  # It detects erroneous and unrecommended scenarios on the interface.
-  namespace eval checker {
-    proc src {} {
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::SetLib "lapb"
-      hbs::AddFile checker.vhd
-    }
+# Interface checker core.
+# It detects erroneous and unrecommended scenarios on the interface.
+namespace eval checker {
+proc src {} {
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::SetLib "lapb"
+hbs::AddFile checker.vhd
+}
 
-    proc _tb {top} {
-      hbs::SetTool "nvc"
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-      }
-      hbs::SetTop $top
-      src
-      hbs::SetLib ""
-    }
+proc _tb {top} {
+hbs::SetTool "nvc"
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+}
+hbs::SetTop $top
+src
+hbs::SetLib ""
+}
 
-    # Testbench for warnings detection logic.
-    proc tb-detect-warnings {} {
-      _tb "tb_detect_warnings"
-      hbs::AddFile tb/checker/tb-detect-warnings.vhd
-      hbs::Run
-    }
+# Testbench for warnings detection logic.
+proc tb-detect-warnings {} {
+_tb "tb_detect_warnings"
+hbs::AddFile tb/checker/tb-detect-warnings.vhd
+hbs::Run
+}
 
-    # Testbench for errors detection logic.
-    proc tb-detect-errors {} {
-      _tb "tb_detect_errors"
-      hbs::AddFile tb/checker/tb-detect-errors.vhd
-      hbs::SetExitSeverity "failure"
-      hbs::Run
-    }
+# Testbench for errors detection logic.
+proc tb-detect-errors {} {
+_tb "tb_detect_errors"
+hbs::AddFile tb/checker/tb-detect-errors.vhd
+hbs::SetExitSeverity "failure"
+hbs::Run
+}
 
-    # Testbench checking that no warnings or errors are issued during correct transaction.
-    proc tb-correct-transaction {} {
-      _tb "tb_correct_transaction"
-      hbs::AddFile tb/checker/tb-correct-transaction.vhd
-      hbs::SetExitSeverity "warning"
-      hbs::Run
-    }
+# Testbench checking that no warnings or errors are issued during correct transaction.
+proc tb-correct-transaction {} {
+_tb "tb_correct_transaction"
+hbs::AddFile tb/checker/tb-correct-transaction.vhd
+hbs::SetExitSeverity "warning"
+hbs::Run
+}
 
-    hbs::Register
-  }
+hbs::Register
+}
 
-  # Bus Function Model. It is useful only for simulation.
-  namespace eval bfm {
-    proc src {} {
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::SetLib "lapb"
-      hbs::AddFile bfm.vhd
-    }
+# Bus Function Model. It is useful only for simulation.
+namespace eval bfm {
+proc src {} {
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::SetLib "lapb"
+hbs::AddFile bfm.vhd
+}
 
-    proc _tb {top} {
-      hbs::SetTool "nvc"
-      hbs::AddDep vhdl::amba5::apb::checker::src
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-      }
-      hbs::SetExitSeverity "warning"
-      hbs::SetTop $top
-      src
-      hbs::SetLib ""
-    }
+proc _tb {top} {
+hbs::SetTool "nvc"
+hbs::AddDep vhdl::amba5::apb::checker::src
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+}
+hbs::SetExitSeverity "warning"
+hbs::SetTop $top
+src
+hbs::SetLib ""
+}
 
-    proc tb-write {} {
-      _tb "tb_write"
-      hbs::AddFile tb/bfm/tb-write.vhd
-      hbs::Run
-    }
+proc tb-write {} {
+_tb "tb_write"
+hbs::AddFile tb/bfm/tb-write.vhd
+hbs::Run
+}
 
-    proc tb-read {} {
-      _tb "tb_read"
-      hbs::AddFile tb/bfm/tb-read.vhd
-      hbs::Run
-    }
+proc tb-read {} {
+_tb "tb_read"
+hbs::AddFile tb/bfm/tb-read.vhd
+hbs::Run
+}
 
-    proc tb-writeb {} {
-      _tb "tb_writeb"
-      hbs::AddFile tb/bfm/tb-writeb.vhd
-      hbs::Run
-    }
+proc tb-writeb {} {
+_tb "tb_writeb"
+hbs::AddFile tb/bfm/tb-writeb.vhd
+hbs::Run
+}
 
-    proc tb-readb {} {
-      _tb "tb_readb"
-      hbs::AddFile tb/bfm/tb-readb.vhd
-      hbs::Run
-    }
+proc tb-readb {} {
+_tb "tb_readb"
+hbs::AddFile tb/bfm/tb-readb.vhd
+hbs::Run
+}
 
-    hbs::Register
-  }
+hbs::Register
+}
 
-  # A classic NxM crossbar.
-  namespace eval crossbar {
-    proc src {} {
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::SetLib "lapb"
-      hbs::AddFile crossbar.vhd
-    }
+# A classic NxM crossbar.
+namespace eval crossbar {
+proc src {} {
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::SetLib "lapb"
+hbs::AddFile crossbar.vhd
+}
 
-    proc _tb {top} {
-      hbs::SetTool "nvc"
-      hbs::AddDep vhdl::amba5::apb::checker::src
-      hbs::AddDep vhdl::amba5::apb::bfm::src
-      hbs::AddDep vhdl::amba5::apb::mock-completer::src
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-        hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
-      }
-      hbs::SetTop $top
-      hbs::AddDep $hbs::ThisCorePath\::src
-      hbs::SetLib ""
-    }
+proc _tb {top} {
+hbs::SetTool "nvc"
+hbs::AddDep vhdl::amba5::apb::checker::src
+hbs::AddDep vhdl::amba5::apb::bfm::src
+hbs::AddDep vhdl::amba5::apb::mock-completer::src
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
+}
+hbs::SetTop $top
+hbs::AddDep $hbs::ThisCorePath\::src
+hbs::SetLib ""
+}
 
-    # Making an equivalent testbench with asynchronous address decoding makes
-    # no sense as all requesters address the same completer all the time.
-    proc tb-3-reqs-1-com {} {
-      _tb "tb_3_reqs_1_com"
-      hbs::AddFile tb/crossbar/tb-3-reqs-1-com.vhd
-      hbs::Run
-    }
+# Making an equivalent testbench with asynchronous address decoding makes
+# no sense as all requesters address the same completer all the time.
+proc tb-3-reqs-1-com {} {
+_tb "tb_3_reqs_1_com"
+hbs::AddFile tb/crossbar/tb-3-reqs-1-com.vhd
+hbs::Run
+}
 
-    proc tb-2-reqs-2-coms-sync-addr-decoding {} {
-      _tb "tb_2_reqs_2_coms"
-      hbs::AddFile tb/crossbar/tb-2-reqs-2-coms.vhd
-      hbs::Run
-    }
+proc tb-2-reqs-2-coms-sync-addr-decoding {} {
+_tb "tb_2_reqs_2_coms"
+hbs::AddFile tb/crossbar/tb-2-reqs-2-coms.vhd
+hbs::Run
+}
 
-    proc tb-2-reqs-2-coms-async-addr-decoding {} {
-      _tb "tb_2_reqs_2_coms"
-      hbs::AddFile tb/crossbar/tb-2-reqs-2-coms.vhd
-      hbs::SetGeneric SYNC_ADDR_DECODING "false"
-      hbs::Run
-    }
+proc tb-2-reqs-2-coms-async-addr-decoding {} {
+_tb "tb_2_reqs_2_coms"
+hbs::AddFile tb/crossbar/tb-2-reqs-2-coms.vhd
+hbs::SetGeneric SYNC_ADDR_DECODING "false"
+hbs::Run
+}
 
-    hbs::Register
-  }
+hbs::Register
+}
 
-  namespace eval shared-bus {
-    proc src {} {
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::SetLib "lapb"
-      hbs::AddFile shared-bus.vhd
-    }
+namespace eval shared-bus {
+proc src {} {
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::SetLib "lapb"
+hbs::AddFile shared-bus.vhd
+}
 
-    proc _tb {top} {
-      hbs::SetTool "nvc"
-      hbs::AddDep vhdl::amba5::apb::checker::src
-      hbs::AddDep vhdl::amba5::apb::bfm::src
-      hbs::AddDep vhdl::amba5::apb::mock-completer::src
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-        hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
-      }
-      hbs::SetTop $top
-      hbs::AddDep $hbs::ThisCorePath\::src
-      hbs::SetLib ""
-    }
+proc _tb {top} {
+hbs::SetTool "nvc"
+hbs::AddDep vhdl::amba5::apb::checker::src
+hbs::AddDep vhdl::amba5::apb::bfm::src
+hbs::AddDep vhdl::amba5::apb::mock-completer::src
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
+}
+hbs::SetTop $top
+hbs::AddDep $hbs::ThisCorePath\::src
+hbs::SetLib ""
+}
 
-    proc tb-2-reqs-1-com-sync-addr-decoding {} {
-      _tb "tb_2_reqs_1_com"
-      hbs::AddFile tb/shared-bus/tb-2-reqs-1-com.vhd
-      hbs::Run
-    }
+proc tb-2-reqs-1-com-sync-addr-decoding {} {
+_tb "tb_2_reqs_1_com"
+hbs::AddFile tb/shared-bus/tb-2-reqs-1-com.vhd
+hbs::Run
+}
 
-    proc tb-2-reqs-1-com-async-addr-decoding {} {
-      _tb "tb_2_reqs_1_com"
-      hbs::AddFile tb/shared-bus/tb-2-reqs-1-com.vhd
-      hbs::SetGeneric SYNC_ADDR_DECODING "false"
-      hbs::Run
-    }
+proc tb-2-reqs-1-com-async-addr-decoding {} {
+_tb "tb_2_reqs_1_com"
+hbs::AddFile tb/shared-bus/tb-2-reqs-1-com.vhd
+hbs::SetGeneric SYNC_ADDR_DECODING "false"
+hbs::Run
+}
 
-    proc tb-1-req-2-coms-sync-addr-decoding {} {
-      _tb "tb_1_req_2_coms"
-      hbs::AddFile tb/shared-bus/tb-1-req-2-coms.vhd
-      hbs::Run
-    }
+proc tb-1-req-2-coms-sync-addr-decoding {} {
+_tb "tb_1_req_2_coms"
+hbs::AddFile tb/shared-bus/tb-1-req-2-coms.vhd
+hbs::Run
+}
 
-    proc tb-1-req-2-coms-async-addr-decoding {} {
-      _tb "tb_1_req_2_coms"
-      hbs::AddFile tb/shared-bus/tb-1-req-2-coms.vhd
-      hbs::SetGeneric SYNC_ADDR_DECODING "false"
-      hbs::Run
-    }
+proc tb-1-req-2-coms-async-addr-decoding {} {
+_tb "tb_1_req_2_coms"
+hbs::AddFile tb/shared-bus/tb-1-req-2-coms.vhd
+hbs::SetGeneric SYNC_ADDR_DECODING "false"
+hbs::Run
+}
 
-    hbs::Register
-  }
+hbs::Register
+}
 
-  # Simple memory Completer that is always ready.
-  namespace eval mock-completer {
-    proc src {} {
-      hbs::SetLib "lapb"
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::AddFile mock-completer.vhd
-    }
+# Simple memory Completer that is always ready.
+namespace eval mock-completer {
+proc src {} {
+hbs::SetLib "lapb"
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::AddFile mock-completer.vhd
+}
 
-    proc tb {} {
-      hbs::SetTool "nvc"
-      hbs::SetTop "tb"
-      src
-      hbs::AddDep vhdl::amba5::apb::bfm::src
-      hbs::AddDep vhdl::amba5::apb::checker::src
-      hbs::SetLib ""
-      hbs::AddFile tb/mock-completer/tb.vhd
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-        hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
-      }
-      hbs::SetExitSeverity "warning"
-      hbs::Run
-    }
+proc tb {} {
+hbs::SetTool "nvc"
+hbs::SetTop "tb"
+src
+hbs::AddDep vhdl::amba5::apb::bfm::src
+hbs::AddDep vhdl::amba5::apb::checker::src
+hbs::SetLib ""
+hbs::AddFile tb/mock-completer/tb.vhd
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
+}
+hbs::SetExitSeverity "warning"
+hbs::Run
+}
 
-    hbs::Register
-  }
+hbs::Register
+}
 
-  # Bridge capable of converting stream of bytes into APB transactions.
-  namespace eval serial-bridge {
-    proc src {} {
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::SetLib "lapb"
-      hbs::AddFile serial-bridge.vhd
-    }
+# Bridge capable of converting stream of bytes into APB transactions.
+namespace eval serial-bridge {
+proc src {} {
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::SetLib "lapb"
+hbs::AddFile serial-bridge.vhd
+}
 
-    proc _tb {top} {
-      hbs::SetTool "nvc"
-      hbs::AddDep vhdl::amba5::apb::checker::src
-      hbs::AddDep vhdl::amba5::apb::mock-completer::src
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-        hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
-      }
-      hbs::SetTop $top
-      hbs::AddDep $hbs::ThisCorePath\::src
-      hbs::SetLib ""
-    }
+proc _tb {top} {
+hbs::SetTool "nvc"
+hbs::AddDep vhdl::amba5::apb::checker::src
+hbs::AddDep vhdl::amba5::apb::mock-completer::src
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
+}
+hbs::SetTop $top
+hbs::AddDep $hbs::ThisCorePath\::src
+hbs::SetLib ""
+}
 
-    proc tb-read {} {
-      _tb "tb_read"
-      hbs::AddFile tb/serial-bridge/tb-read.vhd
-      hbs::Run
-    }
+proc tb-read {} {
+_tb "tb_read"
+hbs::AddFile tb/serial-bridge/tb-read.vhd
+hbs::Run
+}
 
-    proc tb-write {} {
-      _tb "tb_write"
-      hbs::AddFile tb/serial-bridge/tb-write.vhd
-      hbs::Run
-    }
+proc tb-write {} {
+_tb "tb_write"
+hbs::AddFile tb/serial-bridge/tb-write.vhd
+hbs::Run
+}
 
-    hbs::Register
-  }
+proc tb-rmw {} {
+_tb "tb_rmw"
+hbs::AddFile tb/serial-bridge/tb-rmw.vhd
+hbs::Run
+}
 
-  # A clock domain corssing bridge.
-  # The bridge is capable of connecting arbitrary clock domains.
-  namespace eval cdc-bridge {
-    proc src {} {
-      hbs::AddDep vhdl::amba5::apb::pkg::src
-      hbs::SetLib "lapb"
-      hbs::AddFile cdc-bridge.vhd
-    }
+hbs::Register
+}
 
-    proc _tb {} {
-      hbs::SetTool "nvc"
-      hbs::AddDep vhdl::amba5::apb::bfm::src
-      hbs::AddDep vhdl::amba5::apb::checker::src
-      hbs::AddDep vhdl::amba5::apb::mock-completer::src
-      if {$hbs::Tool eq "nvc"} {
-        hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
-        hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
-      }
-      hbs::SetTop "tb"
-      hbs::AddDep $hbs::ThisCorePath\::src
-      hbs::SetLib ""
-      hbs::AddFile tb/cdc-bridge/tb.vhd
-    }
+# A clock domain corssing bridge.
+# The bridge is capable of connecting arbitrary clock domains.
+namespace eval cdc-bridge {
+proc src {} {
+hbs::AddDep vhdl::amba5::apb::pkg::src
+hbs::SetLib "lapb"
+hbs::AddFile cdc-bridge.vhd
+}
 
-    proc tb-to-faster {} {
-      _tb
-      hbs::SetGeneric REQ_CLK_PERIOD 10
-      hbs::SetGeneric COM_CLK_PERIOD 3
-      hbs::Run
-    }
+proc _tb {} {
+hbs::SetTool "nvc"
+hbs::AddDep vhdl::amba5::apb::bfm::src
+hbs::AddDep vhdl::amba5::apb::checker::src
+hbs::AddDep vhdl::amba5::apb::mock-completer::src
+if {$hbs::Tool eq "nvc"} {
+hbs::AddPreSimCb hbs::SetArgsPrefix "--messages=compact"
+hbs::AddPreSimCb hbs::SetArgsSuffix "--dump-arrays"
+}
+hbs::SetTop "tb"
+hbs::AddDep $hbs::ThisCorePath\::src
+hbs::SetLib ""
+hbs::AddFile tb/cdc-bridge/tb.vhd
+}
 
-    proc tb-to-slower {} {
-      _tb
-      hbs::SetGeneric REQ_CLK_PERIOD 5
-      hbs::SetGeneric COM_CLK_PERIOD 12
-      hbs::Run
-    }
+proc tb-to-faster {} {
+_tb
+hbs::SetGeneric REQ_CLK_PERIOD 10
+hbs::SetGeneric COM_CLK_PERIOD 3
+hbs::Run
+}
 
-    proc tb-similar-faster {} {
-      _tb
-      hbs::SetGeneric REQ_CLK_PERIOD 23
-      hbs::SetGeneric COM_CLK_PERIOD 22
-      hbs::Run
-    }
+proc tb-to-slower {} {
+_tb
+hbs::SetGeneric REQ_CLK_PERIOD 5
+hbs::SetGeneric COM_CLK_PERIOD 12
+hbs::Run
+}
 
-    proc tb-similar-slower {} {
-      _tb
-      hbs::SetGeneric REQ_CLK_PERIOD 22
-      hbs::SetGeneric COM_CLK_PERIOD 23
-      hbs::Run
-    }
+proc tb-similar-faster {} {
+_tb
+hbs::SetGeneric REQ_CLK_PERIOD 23
+hbs::SetGeneric COM_CLK_PERIOD 22
+hbs::Run
+}
 
-    hbs::Register
-  }
+proc tb-similar-slower {} {
+_tb
+hbs::SetGeneric REQ_CLK_PERIOD 22
+hbs::SetGeneric COM_CLK_PERIOD 23
+hbs::Run
+}
+
+hbs::Register
+}
 }

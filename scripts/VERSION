@@ -1,0 +1,6 @@
+HBS Build System
+Source: https://github.com/m-kru/hbs
+Fetched: 2026-01-12 from master branch
+
+These scripts are vendored for reproducible builds.
+To update, re-download from the source repository.

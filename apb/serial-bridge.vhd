@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: MIT
 -- https://github.com/m-kru/vhdl-amba5
--- Copyright (c) 2025 Michał Kruszewski
+-- Copyright (c) 2026 Michał Kruszewski
 
 library ieee;
   use ieee.std_logic_1164.all;
@@ -174,7 +174,7 @@ package serial_bridge is
   --
   -- *_PULL - fetching data from serial input.
   -- *_PUSH - writing data to serial output.
-  type state_t is (IDLE, ADDR_PULL, DATA_PULL, STATUS_PUSH, DATA_PUSH, TRANSFER, FLUSH);
+  type state_t is (IDLE, ADDR_PULL, DATA_PULL, MASK_PULL, STATUS_PUSH, DATA_PUSH, TRANSFER, RMW_READ, RMW_WRITE, FLUSH);
 
   -- Serial bridge signals.
   --
@@ -198,6 +198,8 @@ package serial_bridge is
     size     : natural range 0 to 255;
     typ      : transaction_type_t;
     data     : std_logic_vector(31 downto 0);
+    mask     : std_logic_vector(31 downto 0); -- Mask for RMW transaction
+    rmw_phase : natural range 0 to 1; -- 0 = read phase, 1 = write phase
   end record;
 
   -- Some simulators, for example, questa, doesn't accept init function within other init function.
@@ -270,7 +272,9 @@ package body serial_bridge is
     byte_cnt        : natural range 0 to 3 := 0;
     size            : natural range 0 to 255 := 0;
     typ             : transaction_type_t := READ;
-    data            : std_logic_vector(31 downto 0) := (others => '-')
+    data            : std_logic_vector(31 downto 0) := (others => '-');
+    mask            : std_logic_vector(31 downto 0) := (others => '-');
+    rmw_phase       : natural range 0 to 1 := 0
   ) return serial_bridge_t is
     constant sb : serial_bridge_t := (
       REPORT_PREFIX   => make(REPORT_PREFIX),
@@ -283,7 +287,9 @@ package body serial_bridge is
       byte_cnt        => byte_cnt,
       size            => size,
       typ             => typ,
-      data            => data
+      data            => data,
+      mask            => mask,
+      rmw_phase       => rmw_phase
     );
   begin
     return sb;
@@ -380,7 +386,10 @@ package body serial_bridge is
 
       if sb.byte_cnt = 0 then
         if sb.typ = RMW then
-          report "unimplemented" severity failure;
+          -- For RMW, after collecting data bytes, collect mask bytes
+          sb.data := sb.apb_req.wdata; -- Save data for later use
+          sb.byte_cnt := 3;
+          sb.state := MASK_PULL;
         else
           sb.ibyte_ready := '0';
           sb.apb_req.selx := '1';
@@ -522,6 +531,124 @@ package body serial_bridge is
   end function;
 
 
+  -- clock_mask_pull collects the 4 mask bytes for RMW transaction.
+  function clock_mask_pull (
+    serial_bridge : serial_bridge_t;
+    ibyte         : std_logic_vector(7 downto 0);
+    ibyte_valid   : std_logic;
+    obyte_ready   : std_logic;
+    apb_com       : completer_out_t
+  ) return serial_bridge_t is
+    variable sb : serial_bridge_t := serial_bridge;
+  begin
+    if sb.ibyte_ready and ibyte_valid then
+      sb.mask(sb.byte_cnt * 8 + 7 downto sb.byte_cnt * 8) := ibyte;
+
+      if sb.byte_cnt = 0 then
+        -- All mask bytes collected, start APB read phase
+        sb.ibyte_ready := '0';
+        sb.apb_req.selx := '1';
+        sb.apb_req.write := '0';
+        sb.apb_req.strb := b"0000";
+        sb.rmw_phase := 0;
+        sb.state := RMW_READ;
+        report to_string(sb.REPORT_PREFIX) &
+          "RMW: starting read phase, addr x""" & to_hstring(sb.apb_req.addr) & """";
+      else
+        sb.byte_cnt := sb.byte_cnt - 1;
+      end if;
+    else
+      sb.ibyte_ready := '1';
+    end if;
+
+    return sb;
+  end function;
+
+
+  -- clock_rmw_read performs the APB read phase of RMW transaction.
+  function clock_rmw_read (
+    serial_bridge : serial_bridge_t;
+    ibyte         : std_logic_vector(7 downto 0);
+    ibyte_valid   : std_logic;
+    obyte_ready   : std_logic;
+    apb_com       : completer_out_t
+  ) return serial_bridge_t is
+    variable sb : serial_bridge_t := serial_bridge;
+    variable read_data : std_logic_vector(31 downto 0);
+    variable modified_data : std_logic_vector(31 downto 0);
+  begin
+    if sb.apb_req.enable = '1' and apb_com.ready = '1' then
+      read_data := apb_com.rdata;
+
+      -- Output read phase status byte
+      sb.obyte(7) := apb_com.slverr;
+      sb.obyte(6 downto 0) := b"0000000";
+      sb.obyte_valid := '1';
+
+      if apb_com.slverr = '1' then
+        -- Read failed, abort RMW
+        sb.apb_req.selx := '0';
+        sb.apb_req.enable := '0';
+        sb.state := STATUS_PUSH;
+        report to_string(sb.REPORT_PREFIX) &
+          "RMW: read phase failed with slverr" severity warning;
+      else
+        -- Apply mask: WDATA = (RDATA & ~Mask) | (Data & Mask)
+        modified_data := (read_data and not sb.mask) or (sb.data and sb.mask);
+        sb.apb_req.wdata := modified_data;
+        sb.apb_req.selx := '0';
+        sb.apb_req.enable := '0';
+        sb.rmw_phase := 1;
+        sb.state := RMW_WRITE;
+        report to_string(sb.REPORT_PREFIX) &
+          "RMW: read phase complete, rdata x""" & to_hstring(read_data) &
+          """, wdata x""" & to_hstring(modified_data) & """";
+      end if;
+    else
+      sb.apb_req.enable := '1';
+    end if;
+
+    return sb;
+  end function;
+
+
+  -- clock_rmw_write performs the APB write phase of RMW transaction.
+  function clock_rmw_write (
+    serial_bridge : serial_bridge_t;
+    ibyte         : std_logic_vector(7 downto 0);
+    ibyte_valid   : std_logic;
+    obyte_ready   : std_logic;
+    apb_com       : completer_out_t
+  ) return serial_bridge_t is
+    variable sb : serial_bridge_t := serial_bridge;
+  begin
+    -- Wait for read status byte to be consumed first
+    if sb.obyte_valid = '1' then
+      if obyte_ready = '1' then
+        sb.obyte_valid := '0';
+        -- Start write phase
+        sb.apb_req.selx := '1';
+        sb.apb_req.write := '1';
+        sb.apb_req.strb := b"1111";
+      end if;
+    elsif sb.apb_req.enable = '1' and apb_com.ready = '1' then
+      -- Write complete, output write status byte
+      sb.obyte(7) := apb_com.slverr;
+      sb.obyte(6 downto 0) := b"0000000";
+      sb.obyte_valid := '1';
+      sb.apb_req.selx := '0';
+      sb.apb_req.enable := '0';
+      sb.state := STATUS_PUSH;
+      report to_string(sb.REPORT_PREFIX) &
+        "RMW: write phase complete" & (if apb_com.slverr = '1' then " with slverr" else "");
+    elsif sb.apb_req.selx = '1' then
+      sb.apb_req.enable := '1';
+    end if;
+
+    return sb;
+  end function;
+
+
   function clock (
     serial_bridge : serial_bridge_t;
     ibyte         : std_logic_vector(7 downto 0);
@@ -535,11 +662,13 @@ package body serial_bridge is
       when IDLE        => sb := clock_idle        (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
       when ADDR_PULL   => sb := clock_addr_pull   (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
       when DATA_PULL   => sb := clock_data_pull   (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
+      when MASK_PULL   => sb := clock_mask_pull   (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
       when TRANSFER    => sb := clock_transfer    (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
+      when RMW_READ    => sb := clock_rmw_read    (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
+      when RMW_WRITE   => sb := clock_rmw_write   (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
       when STATUS_PUSH => sb := clock_status_push (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
       when DATA_PUSH   => sb := clock_data_push   (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
       when FLUSH       => sb := clock_flush       (sb, ibyte, ibyte_valid, obyte_ready, apb_com);
-      when others => report "unimplemented state " & state_t'image(sb.state) severity failure;
     end case;
 
     return sb;
